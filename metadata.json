@@ -1,0 +1,6 @@
+{
+  "name": "Intellistreet",
+  "description": "A smart-city civic engagement platform enabling citizens to report, verify, track, and resolve local issues with AI-driven categorization, interactive geocoding maps, and social discussion feeds.",
+  "requestFramePermissions": ["geolocation", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
