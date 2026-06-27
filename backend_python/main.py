@@ -3,10 +3,10 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from .config import PORT, GEMINI_API_KEY
-from .agent import execute_agent_turn
-from .sensing import analyze_visual_sensing
-from .learning import analyze_municipal_patterns
+from config import PORT, GEMINI_API_KEY
+from agent import execute_agent_turn
+from sensing import analyze_visual_sensing
+from learning import analyze_municipal_patterns
 
 app = FastAPI(
     title="IntelliStreet Civic AI Backend",

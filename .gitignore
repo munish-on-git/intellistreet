@@ -5,3 +5,7 @@ coverage/
 *.log
 .env*
 !.env.example
+/backend_python/venv
+/public
+/data
+/backend_python/__pycache__
