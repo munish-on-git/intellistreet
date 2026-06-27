@@ -696,7 +696,10 @@ export default function IntellistreetApp() {
                   key={tab.id}
                   onClick={() => {
                     setActiveTab(tab.id as any);
-                    if (tab.id !== 'map') setSelectedComplaint(null);
+                    if (tab.id !== 'map') {
+                      setSelectedComplaint(null);
+                      setFlyToCoord(null);
+                    }
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                     activeTab === tab.id
@@ -883,6 +886,17 @@ export default function IntellistreetApp() {
                           <span className={getPriorityTextColor(selectedComplaint.priority)}>{selectedComplaint.priority.toUpperCase()}</span>
                         </div>
                       </div>
+
+                      <button
+                        onClick={() => {
+                          if (typeof window !== 'undefined' && (window as any).inspectTelemetry) {
+                            (window as any).inspectTelemetry(selectedComplaint.id);
+                          }
+                        }}
+                        className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-400 hover:brightness-110 text-[#070a13] font-extrabold rounded-2xl text-xs cursor-pointer shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.99] flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <Sparkles size={14} /> Inspect Live Satellite Telemetry
+                      </button>
 
                       {/* Vote Verification Panel for Citizens */}
                       {user.role === 'citizen' && selectedComplaint.user_id !== user.id && (
@@ -1657,6 +1671,22 @@ export default function IntellistreetApp() {
                         </div>
 
                         <div className="flex justify-end gap-3 pt-2">
+                          <button
+                            onClick={() => {
+                              const complaint = selectedComplaint;
+                              setActiveTab('map');
+                              setSelectedComplaint(complaint);
+                              setFlyToCoord({ latitude: complaint.latitude, longitude: complaint.longitude });
+                              setTimeout(() => {
+                                if (typeof window !== 'undefined' && (window as any).inspectTelemetry) {
+                                  (window as any).inspectTelemetry(complaint.id);
+                                }
+                              }, 600);
+                            }}
+                            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-500 hover:brightness-110 text-white font-extrabold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 shadow-lg shadow-blue-500/10 active:scale-[0.98] transition-all"
+                          >
+                            <Sparkles size={13} /> Inspect GIS Telemetry
+                          </button>
                           <button
                             onClick={() => setSelectedComplaint(null)}
                             className="px-5 py-2.5 bg-slate-800 text-gray-300 font-bold rounded-xl text-xs cursor-pointer border border-gray-700"
