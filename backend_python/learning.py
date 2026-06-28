@@ -3,8 +3,8 @@ from datetime import datetime
 from collections import Counter
 from google import genai
 from google.genai import types
-from config import GEMINI_API_KEY
-from agent import load_db
+from .config import GEMINI_API_KEY
+from .agent import load_db
 
 def analyze_municipal_patterns() -> dict:
     """

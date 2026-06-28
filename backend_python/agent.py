@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from google import genai
 from google.genai import types
-from config import GEMINI_API_KEY, get_db_path
+from .config import GEMINI_API_KEY, get_db_path
 
 # ==========================================
 # Shared JSON Database Driver for Coordination

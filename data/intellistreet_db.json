@@ -1,0 +1,383 @@
+{
+  "users": [
+    {
+      "id": "user_1",
+      "name": "Manish Pathania",
+      "email": "citizen@example.com",
+      "phone": "9876543210",
+      "role": "citizen",
+      "latitude": 22.7196,
+      "longitude": 75.8577,
+      "points": 120,
+      "created_at": "2026-05-29T18:09:03.509Z"
+    },
+    {
+      "id": "user_2",
+      "name": "Officer Rajesh Kumar",
+      "email": "officer@example.com",
+      "phone": "8765432109",
+      "role": "officer",
+      "latitude": 22.7256,
+      "longitude": 75.8677,
+      "points": 450,
+      "created_at": "2026-04-29T18:09:03.509Z"
+    },
+    {
+      "id": "user_3",
+      "name": "Suhani Sharma",
+      "email": "admin@example.com",
+      "phone": "7654321098",
+      "role": "admin",
+      "latitude": 22.7126,
+      "longitude": 75.8477,
+      "points": 800,
+      "created_at": "2026-03-30T18:09:03.509Z"
+    },
+    {
+      "id": "user_4",
+      "name": "Amit Patel",
+      "email": "amit@example.com",
+      "phone": "9988776655",
+      "role": "citizen",
+      "latitude": 22.7241,
+      "longitude": 75.8831,
+      "points": 35,
+      "created_at": "2026-06-13T18:09:03.509Z"
+    },
+    {
+      "id": "user_3t71so1",
+      "name": "modi",
+      "email": "modi@abc.com",
+      "phone": "12345678",
+      "role": "citizen",
+      "latitude": 22.7196,
+      "longitude": 75.8577,
+      "points": 0,
+      "created_at": "2026-06-28T18:44:16.791Z"
+    }
+  ],
+  "complaints": [
+    {
+      "id": "report_1",
+      "user_id": "user_4",
+      "reporter_name": "Amit Patel",
+      "title": "Dangerous deep pothole on Vijay Nagar main crossing",
+      "description": "A massive pothole has opened up right on the busy Vijay Nagar main intersection. It is extremely hazardous for two-wheelers, especially at night when streetlights are dim. Several motorcyclists have already slipped attempting to swerve around it.",
+      "image_url": "https://picsum.photos/seed/pothole/800/600",
+      "video_url": "/samples/drone_flyover.mp4",
+      "category": "road_damage",
+      "ai_category": "road_damage",
+      "ai_confidence": 0.94,
+      "priority": "high",
+      "latitude": 22.7533,
+      "longitude": 75.8937,
+      "address": "Vijay Nagar Square, Sector C, Scheme No 54, Indore, Madhya Pradesh",
+      "department": "Road Maintenance Department",
+      "status": "in_progress",
+      "verification_count": 5,
+      "is_verified": true,
+      "votes": [
+        {
+          "user_id": "user_1",
+          "vote": "confirmed",
+          "created_at": "2026-06-26T18:09:03.509Z"
+        },
+        {
+          "user_id": "user_2",
+          "vote": "confirmed",
+          "created_at": "2026-06-26T22:57:03.509Z"
+        },
+        {
+          "user_id": "user_4",
+          "vote": "confirmed",
+          "created_at": "2026-06-26T15:45:03.509Z"
+        }
+      ],
+      "comments": [
+        {
+          "id": "comment_11",
+          "user_id": "user_1",
+          "user_name": "Manish Pathania",
+          "role": "citizen",
+          "text": "Confirming this, I hit my wheel on it yesterday. Extremely dangerous!",
+          "created_at": "2026-06-26T18:09:03.509Z"
+        },
+        {
+          "id": "comment_12",
+          "user_id": "user_2",
+          "user_name": "Officer Rajesh Kumar",
+          "role": "officer",
+          "text": "Thanks for the report. AI categorized it correctly. Sent work order to Road Maintenance. Team will initiate patching tonight.",
+          "created_at": "2026-06-27T06:09:03.509Z"
+        }
+      ],
+      "admin_notes": "Patch work scheduled. Road roller dispatched.",
+      "created_at": "2026-06-25T18:09:03.509Z",
+      "updated_at": "2026-06-27T18:09:03.509Z"
+    },
+    {
+      "id": "report_2",
+      "user_id": "user_1",
+      "reporter_name": "Manish Pathania",
+      "title": "Severe water pipeline leakage flooding Saket residential street",
+      "description": "A primary municipal water supply pipe has ruptured under the sidewalk on Saket Street 4. Gallons of fresh drinking water are bursting out, flooding the entire lane and making it impossible for pedestrians to walk.",
+      "image_url": "https://picsum.photos/seed/waterleak/800/600",
+      "category": "water_leakage",
+      "ai_category": "water_leakage",
+      "ai_confidence": 0.88,
+      "priority": "high",
+      "latitude": 22.7301,
+      "longitude": 75.8845,
+      "address": "42, Saket Nagar, Near Saket Club, Indore, Madhya Pradesh",
+      "department": "Water Supply Department",
+      "status": "verified",
+      "verification_count": 3,
+      "is_verified": true,
+      "votes": [
+        {
+          "user_id": "user_4",
+          "vote": "confirmed",
+          "created_at": "2026-06-27T18:09:03.509Z"
+        },
+        {
+          "user_id": "user_3",
+          "vote": "confirmed",
+          "created_at": "2026-06-27T22:57:03.509Z"
+        }
+      ],
+      "comments": [
+        {
+          "id": "comment_21",
+          "user_id": "user_4",
+          "user_name": "Amit Patel",
+          "role": "citizen",
+          "text": "Literally half the street is submerged. What a waste of clean water!",
+          "created_at": "2026-06-27T18:09:03.509Z"
+        }
+      ],
+      "created_at": "2026-06-27T13:21:03.509Z",
+      "updated_at": "2026-06-28T06:09:03.509Z"
+    },
+    {
+      "id": "report_3",
+      "user_id": "user_4",
+      "reporter_name": "Amit Patel",
+      "title": "3 adjacent streetlights failed near LIG Square park",
+      "description": "The streetlights bordering the neighborhood public park at LIG are completely blacked out for the last 3 nights. The alleyway has become extremely dark and unsafe for women and children returning home in the evening.",
+      "image_url": "https://picsum.photos/seed/streetlight/800/600",
+      "category": "street_light_failure",
+      "ai_category": "street_light_failure",
+      "ai_confidence": 0.91,
+      "priority": "medium",
+      "latitude": 22.7412,
+      "longitude": 75.8789,
+      "address": "LIG Park lane, Scheme No 54, Indore, Madhya Pradesh",
+      "department": "Electricity Department",
+      "status": "pending",
+      "verification_count": 1,
+      "is_verified": false,
+      "votes": [],
+      "comments": [],
+      "created_at": "2026-06-28T06:09:03.509Z",
+      "updated_at": "2026-06-28T06:09:03.509Z"
+    },
+    {
+      "id": "report_4",
+      "user_id": "user_1",
+      "reporter_name": "Manish Pathania",
+      "title": "Huge unmanaged garbage dumping on Rajwada heritage path",
+      "description": "A large pile of rotting organic waste and plastic bags has been dumped right on the side of the historic Rajwada palace heritage pathway. It is emitting a terrible stench and stray dogs are scattering it all over the tourist walk.",
+      "image_url": "https://picsum.photos/seed/garbage/800/600",
+      "category": "garbage",
+      "ai_category": "garbage",
+      "ai_confidence": 0.97,
+      "priority": "medium",
+      "latitude": 22.7196,
+      "longitude": 75.8577,
+      "address": "Rajwada, Mahatma Gandhi Road, Indore, Madhya Pradesh",
+      "department": "Sanitation Department",
+      "status": "resolved",
+      "verification_count": 4,
+      "is_verified": true,
+      "votes": [
+        {
+          "user_id": "user_4",
+          "vote": "confirmed",
+          "created_at": "2026-06-24T18:09:03.509Z"
+        }
+      ],
+      "comments": [
+        {
+          "id": "comment_41",
+          "user_id": "user_3",
+          "user_name": "Suhani Sharma",
+          "role": "admin",
+          "text": "Extremely critical due to tourism. Sanitation squad dispatched immediately.",
+          "created_at": "2026-06-24T18:09:03.509Z"
+        }
+      ],
+      "admin_notes": "Sanitation squad cleared the spot. Imposed a fine warning in the commercial zone.",
+      "resolution_proof_url": "https://picsum.photos/seed/resolved/800/600",
+      "created_at": "2026-06-23T18:09:03.509Z",
+      "updated_at": "2026-06-25T18:09:03.509Z"
+    },
+    {
+      "id": "report_s3hhq0w",
+      "user_id": "user_3t71so1",
+      "reporter_name": "modi",
+      "title": "pipe broken ",
+      "description": "pipe broken near my road near aa chowk",
+      "image_url": "/uploads/report_1782672349894_n1syo.png",
+      "category": "water_leakage",
+      "ai_category": "garbage",
+      "ai_confidence": 1,
+      "priority": "medium",
+      "latitude": 32.21919704979282,
+      "longitude": 76.14260543296679,
+      "address": "Vijay Nagar Crossing, Sector B, Scheme No 54, Indore, Madhya Pradesh 452010",
+      "department": "Sanitation Department",
+      "status": "pending",
+      "verification_count": 0,
+      "is_verified": false,
+      "comments": [],
+      "votes": [],
+      "created_at": "2026-06-28T18:45:53.756Z",
+      "updated_at": "2026-06-28T18:45:53.756Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg_1",
+      "sender_id": "user_2",
+      "receiver_id": "user_1",
+      "text": "Hi Manish, regarding your report on Saket street flooding, our team is arriving in 15 mins.",
+      "created_at": "2026-06-27T18:09:03.509Z"
+    },
+    {
+      "id": "msg_2",
+      "sender_id": "user_1",
+      "receiver_id": "user_2",
+      "text": "Thank you Rajesh sir! Let me know if you need exact house numbers or if I should meet the plumbers there.",
+      "created_at": "2026-06-27T18:37:51.509Z"
+    },
+    {
+      "id": "msg_3",
+      "sender_id": "user_2",
+      "receiver_id": "user_1",
+      "text": "Yes please, meeting them near Saket Club would be incredibly helpful to pinpoint the main valve.",
+      "created_at": "2026-06-27T19:21:03.509Z"
+    }
+  ],
+  "pickups": [
+    {
+      "id": "SC-2849",
+      "user_id": "user_1",
+      "reporter_name": "Manish Pathania",
+      "reporter_phone": "9876543210",
+      "category": "wet",
+      "image_url": "https://picsum.photos/seed/wetwaste/800/600",
+      "latitude": 22.7196,
+      "longitude": 75.8577,
+      "address": "Rajwada, Mahatma Gandhi Road, Indore, Madhya Pradesh 452002",
+      "priority": "medium",
+      "status": "dispatched",
+      "otp": "4821",
+      "zonal_officer_id": "user_2",
+      "zonal_officer_name": "Officer Rajesh Kumar",
+      "area_man_id": "area_1",
+      "area_man_name": "Ravi Shankar",
+      "pickup_eta": "Today 3:00 PM",
+      "created_at": "2026-06-28T16:09:03.509Z",
+      "updated_at": "2026-06-28T17:39:03.509Z"
+    },
+    {
+      "id": "SC-2848",
+      "user_id": "user_4",
+      "reporter_name": "Amit Patel",
+      "reporter_phone": "9988776655",
+      "category": "medical",
+      "image_url": "https://picsum.photos/seed/medicalwaste/800/600",
+      "latitude": 22.7241,
+      "longitude": 75.8831,
+      "address": "42, Saket Nagar, Near Saket Club, Indore, Madhya Pradesh 452018",
+      "priority": "high",
+      "status": "zonal_assigned",
+      "otp": "1093",
+      "created_at": "2026-06-28T14:09:03.509Z",
+      "updated_at": "2026-06-28T18:27:51.394Z",
+      "zonal_officer_id": "user_2",
+      "zonal_officer_name": "Officer Rajesh Kumar"
+    },
+    {
+      "id": "SC-2847",
+      "user_id": "user_1",
+      "reporter_name": "Manish Pathania",
+      "reporter_phone": "9876543210",
+      "category": "electronics",
+      "image_url": "https://picsum.photos/seed/ewaste/800/600",
+      "latitude": 22.7196,
+      "longitude": 75.8577,
+      "address": "Rajwada, Shop 12, Indore, Madhya Pradesh 452002",
+      "priority": "medium",
+      "status": "completed",
+      "otp": "7724",
+      "zonal_officer_id": "user_2",
+      "zonal_officer_name": "Officer Rajesh Kumar",
+      "area_man_id": "area_1",
+      "area_man_name": "Ravi Shankar",
+      "photo_proof_url": "https://picsum.photos/seed/garbageproof/800/600",
+      "rating": 5,
+      "review_text": "Very professional and timely pickup of my old computer parts. Brilliant initiative!",
+      "created_at": "2026-06-27T18:09:03.509Z",
+      "updated_at": "2026-06-27T20:09:03.509Z"
+    },
+    {
+      "id": "SC-2982",
+      "user_id": "user_1",
+      "reporter_name": "Manish Pathania",
+      "reporter_phone": "9876543210",
+      "category": "dry",
+      "image_url": "https://picsum.photos/seed/defaultwaste/800/600",
+      "latitude": 22.7196,
+      "longitude": 75.8577,
+      "address": "Rajwada Palace Circle, MG Road, Indore, Madhya Pradesh 452002",
+      "priority": "medium",
+      "status": "pending",
+      "otp": "7242",
+      "created_at": "2026-06-28T18:55:33.661Z",
+      "updated_at": "2026-06-28T18:55:33.661Z"
+    },
+    {
+      "id": "SC-2846",
+      "user_id": "user_1",
+      "reporter_name": "Manish Pathania",
+      "reporter_phone": "9876543210",
+      "category": "dry",
+      "image_url": "https://picsum.photos/seed/defaultwaste/800/600",
+      "latitude": 22.7196,
+      "longitude": 75.8577,
+      "address": "Rajwada Palace Circle, MG Road, Indore, Madhya Pradesh 452002",
+      "priority": "medium",
+      "status": "pending",
+      "otp": "2356",
+      "created_at": "2026-06-28T18:55:47.315Z",
+      "updated_at": "2026-06-28T18:55:47.315Z"
+    },
+    {
+      "id": "SC-2918",
+      "user_id": "user_1",
+      "reporter_name": "Manish Pathania",
+      "reporter_phone": "9876543210",
+      "category": "dry",
+      "image_url": "/uploads/pickup_1782672972868_ahlke.png",
+      "latitude": 22.7196,
+      "longitude": 75.8577,
+      "address": "Rajwada Palace Circle, MG Road, Indore, Madhya Pradesh 452002",
+      "priority": "low",
+      "status": "pending",
+      "otp": "6996",
+      "created_at": "2026-06-28T18:56:32.471Z",
+      "updated_at": "2026-06-28T18:56:32.471Z"
+    }
+  ]
+}

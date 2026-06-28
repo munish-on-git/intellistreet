@@ -6,7 +6,8 @@ import dynamic from 'next/dynamic';
 import {
   MapPin, Clock, Users, Zap, Shield, Send, MessageSquare, PlusCircle,
   LogOut, User as UserIcon, CheckCircle, BarChart3, HelpCircle,
-  TrendingUp, Award, RotateCcw, AlertTriangle, ArrowRight, Eye, Upload, Sparkles, Navigation
+  TrendingUp, Award, RotateCcw, AlertTriangle, ArrowRight, Eye, Upload, Sparkles, Navigation,
+  Trash2, Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -76,6 +77,65 @@ interface ChatMessage {
   created_at: string;
 }
 
+function compressImage(file: File, maxWidth = 1024, maxHeight = 1024, quality = 0.8): Promise<File> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+}
+
 export default function IntellistreetApp() {
   // Authentication & Session state
   const [token, setToken] = useState<string | null>(null);
@@ -88,7 +148,33 @@ export default function IntellistreetApp() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Core navigation tabs
-  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'feed' | 'chat' | 'admin' | 'copilot' | 'patterns'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'feed' | 'chat' | 'admin' | 'copilot' | 'patterns' | 'garbage'>('home');
+
+  // Swachh Connect Garbage Pickup States
+  const [activePortal, setActivePortal] = useState<'citizen' | 'admin' | 'zonal' | 'area'>('citizen');
+  const [pickups, setPickups] = useState<any[]>([]);
+  const [isPickupsLoading, setIsPickupsLoading] = useState(false);
+  const [newPickupCategory, setNewPickupCategory] = useState('dry');
+  const [newPickupImage, setNewPickupImage] = useState<File | null>(null);
+  const [newPickupImagePreview, setNewPickupImagePreview] = useState<string | null>(null);
+  const [triggerAiClassification, setTriggerAiClassification] = useState(false);
+  const [aiClassificationResult, setAiClassificationResult] = useState<any | null>(null);
+  const [isAiClassificationLoading, setIsAiClassificationLoading] = useState(false);
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number, lon: number }>({ lat: 22.7196, lon: 75.8577 });
+  const [pickupCoordsManual, setPickupCoordsManual] = useState('22.7196, 75.8577');
+
+  // Interactive states for assignments
+  const [adminAssigneeMap, setAdminAssigneeMap] = useState<Record<string, string>>({});
+  const [zonalCrewMap, setZonalCrewMap] = useState<Record<string, string>>({});
+  const [zonalEtaMap, setZonalEtaMap] = useState<Record<string, string>>({});
+  const [areaOtpInputs, setAreaOtpInputs] = useState<Record<string, string>>({});
+  const [areaProofImages, setAreaProofImages] = useState<Record<string, File | null>>({});
+  const [areaProofPreviews, setAreaProofPreviews] = useState<Record<string, string | null>>({});
+  const [selectedSimCrew, setSelectedSimCrew] = useState<string>('area_1');
+
+  // Rating and reviews states
+  const [citizenRatingMap, setCitizenRatingMap] = useState<Record<string, number>>({});
+  const [citizenReviewMap, setCitizenReviewMap] = useState<Record<string, string>>({});
 
   // AI Copilot States (Python Agent Sidecar)
   const [copilotMessages, setCopilotMessages] = useState<any[]>([
@@ -160,6 +246,196 @@ export default function IntellistreetApp() {
     }
   }
 
+  async function fetchPickups() {
+    setIsPickupsLoading(true);
+    try {
+      const res = await fetch('/api/pickups');
+      if (res.ok) {
+        const data = await res.json();
+        setPickups(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load pickups:', err);
+    } finally {
+      setIsPickupsLoading(false);
+    }
+  }
+
+  async function handleCreatePickup(e: any) {
+    e.preventDefault();
+    if (!user) return;
+    setIsAiClassificationLoading(true);
+    setAiClassificationResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('user_id', user.id);
+      formData.append('category', newPickupCategory);
+      formData.append('latitude', pickupCoords.lat.toString());
+      formData.append('longitude', pickupCoords.lon.toString());
+      if (newPickupImage) {
+        formData.append('image', newPickupImage);
+      }
+      formData.append('trigger_ai', triggerAiClassification ? 'true' : 'false');
+
+      const res = await fetch('/api/pickups', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ai) {
+          setAiClassificationResult(data.ai);
+        }
+        // Reset request states
+        setNewPickupImage(null);
+        setNewPickupImagePreview(null);
+        fetchPickups();
+      } else {
+        let errorMsg = 'Failed to submit pickup request';
+        try {
+          const err = await res.json();
+          errorMsg = err.error || errorMsg;
+        } catch {
+          try {
+            const text = await res.text();
+            if (text.includes('413') || text.toLowerCase().includes('payload too large') || text.toLowerCase().includes('too large')) {
+              errorMsg = 'Image file is too large. Please upload an image smaller than 1MB.';
+            } else {
+              errorMsg = `Server error: ${res.status}`;
+            }
+          } catch {}
+        }
+        alert(errorMsg);
+      }
+    } catch (err: any) {
+      console.error('Error submitting pickup:', err);
+      alert('Error: ' + (err.message || 'Failed to submit pickup request'));
+    } finally {
+      setIsAiClassificationLoading(false);
+    }
+  }
+
+  async function handleAssignZonal(pickupId: string, officerId: string, officerName: string) {
+    try {
+      const res = await fetch(`/api/pickups/${pickupId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'assign_zonal',
+          zonal_officer_id: officerId,
+          zonal_officer_name: officerName
+        })
+      });
+      if (res.ok) {
+        fetchPickups();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to assign zonal officer');
+      }
+    } catch (err) {
+      console.error('Error assigning zonal officer:', err);
+    }
+  }
+
+  async function handleDispatchCrew(pickupId: string, crewId: string, crewName: string, eta: string) {
+    try {
+      const res = await fetch(`/api/pickups/${pickupId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'dispatch',
+          area_man_id: crewId,
+          area_man_name: crewName,
+          pickup_eta: eta || 'Today 4:00 PM'
+        })
+      });
+      if (res.ok) {
+        fetchPickups();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to dispatch crew');
+      }
+    } catch (err) {
+      console.error('Error dispatching crew:', err);
+    }
+  }
+
+  async function handleCompletePickup(pickupId: string, otp: string, proofImageFile: File | null) {
+    try {
+      const proofUrl = proofImageFile 
+        ? 'https://picsum.photos/seed/collectedproof/800/600' 
+        : 'https://picsum.photos/seed/collected/800/600';
+
+      const res = await fetch(`/api/pickups/${pickupId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'collect',
+          otp,
+          photo_proof_url: proofUrl
+        })
+      });
+
+      if (res.ok) {
+        setAreaOtpInputs(prev => {
+          const next = { ...prev };
+          delete next[pickupId];
+          return next;
+        });
+        setAreaProofImages(prev => {
+          const next = { ...prev };
+          delete next[pickupId];
+          return next;
+        });
+        setAreaProofPreviews(prev => {
+          const next = { ...prev };
+          delete next[pickupId];
+          return next;
+        });
+        fetchPickups();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to complete collection. Please verify the code.');
+      }
+    } catch (err) {
+      console.error('Error completing collection:', err);
+    }
+  }
+
+  async function handleSubmitReview(pickupId: string, rating: number, text: string) {
+    try {
+      const res = await fetch(`/api/pickups/${pickupId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'review',
+          rating,
+          review_text: text
+        })
+      });
+      if (res.ok) {
+        setCitizenRatingMap(prev => {
+          const next = { ...prev };
+          delete next[pickupId];
+          return next;
+        });
+        setCitizenReviewMap(prev => {
+          const next = { ...prev };
+          delete next[pickupId];
+          return next;
+        });
+        fetchPickups();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to submit review');
+      }
+    } catch (err) {
+      console.error('Error submitting review:', err);
+    }
+  }
+
   async function fetchComplaints() {
     try {
       const res = await fetch('/api/complaints');
@@ -208,6 +484,7 @@ export default function IntellistreetApp() {
       fetchUserProfile(savedToken);
     }
     fetchComplaints();
+    fetchPickups();
   }, []);
 
   // Poll chats list if authenticated
@@ -232,6 +509,19 @@ export default function IntellistreetApp() {
       fetchPatternInsights();
     }
   }, [activeTab]);
+
+  // Synchronize active Swachh Connect portal with the logged-in user's role
+  useEffect(() => {
+    if (user) {
+      if (user.role === 'admin') {
+        setActivePortal('admin');
+      } else if (user.role === 'officer') {
+        setActivePortal('zonal');
+      } else {
+        setActivePortal('citizen');
+      }
+    }
+  }, [user]);
 
   const handleLogin = async (e?: any, demoEmail?: string, demoPassword?: string) => {
     if (e) e.preventDefault();
@@ -303,18 +593,30 @@ export default function IntellistreetApp() {
     setActiveTab('home');
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setReportImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setReportImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImage(file);
+        setReportImage(compressed);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setReportImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(compressed);
 
-      // Trigger AI Analysis real-time categorizer preview!
-      triggerAiCategorizerPreview(file);
+        // Trigger AI Analysis real-time categorizer preview!
+        triggerAiCategorizerPreview(compressed);
+      } catch (err) {
+        console.error('Image compression failed, using original:', err);
+        setReportImage(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setReportImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+        triggerAiCategorizerPreview(file);
+      }
     }
   };
 
@@ -688,6 +990,7 @@ export default function IntellistreetApp() {
                 { id: 'chat', label: 'Private Messenger', icon: <Send size={18} /> },
                 { id: 'copilot', label: 'AI Dispatch Agent', icon: <Sparkles size={18} className="text-emerald-400" /> },
                 { id: 'patterns', label: 'AI Trend Analytics', icon: <TrendingUp size={18} className="text-teal-400" /> },
+                { id: 'garbage', label: 'Swachh Connect', icon: <Trash2 size={18} className="text-lime-400" /> },
                 ...(user.role === 'officer' || user.role === 'admin'
                   ? [{ id: 'admin', label: 'Officer Terminal', icon: <Shield size={18} /> }]
                   : [])
@@ -719,6 +1022,8 @@ export default function IntellistreetApp() {
                 onClick={() => {
                   handleGeolocate();
                   setIsReportOpen(true);
+                  setSelectedComplaint(null);
+                  setFlyToCoord(null);
                 }}
                 className="w-full bg-gradient-to-tr from-emerald-500 to-teal-400 hover:brightness-110 text-[#070a13] font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/5 transition-all cursor-pointer text-sm"
               >
@@ -1707,6 +2012,878 @@ export default function IntellistreetApp() {
               </div>
             )}
 
+            {/* View Tab: Swachh Connect Garbage pickup loop */}
+            {activeTab === 'garbage' && (
+              <div className="space-y-6">
+                {/* Portal switcher row */}
+                <div className="bg-[#111827]/60 border border-gray-800/80 rounded-3xl p-4 shadow-xl flex flex-wrap gap-2 items-center justify-between backdrop-blur">
+                  <div className="space-y-0.5">
+                    <h3 className="text-md font-bold font-display text-gray-100 flex items-center gap-2">
+                      <Trash2 className="text-lime-400 animate-bounce" size={20} />
+                      Swachh Connect Portal
+                    </h3>
+                    <p className="text-[10px] text-gray-400">
+                      {user?.role === 'citizen' && "Access your personalized citizen waste collection dashboard."}
+                      {user?.role === 'admin' && "Master administration panel for Indore Municipal Corporation."}
+                      {user?.role === 'officer' && "Official municipal officer dispatch and field work verification."}
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1.5 bg-slate-900/80 p-1.5 rounded-2xl border border-gray-800/60">
+                    {[
+                      { id: 'citizen', label: '👤 Citizen App', desc: 'New requests & OTP codes', roles: ['citizen'] },
+                      { id: 'admin', label: '🏛 Admin Dashboard', desc: 'Review & Zonal assign', roles: ['admin'] },
+                      { id: 'zonal', label: '📍 Zonal Officer', desc: 'Dispatch local crew', roles: ['officer'] },
+                      { id: 'area', label: '🚛 Area Crew', desc: 'Verify OTP & Complete', roles: ['officer'] }
+                    ].filter(portal => portal.roles.includes(user?.role || 'citizen')).map((portal) => (
+                      <button
+                        key={portal.id}
+                        type="button"
+                        onClick={() => setActivePortal(portal.id as any)}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer ${
+                          activePortal === portal.id
+                            ? 'bg-gradient-to-r from-lime-500 to-emerald-500 text-[#070a13] shadow-md'
+                            : 'text-gray-300 hover:bg-slate-800/50'
+                        }`}
+                      >
+                        {portal.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CITIZEN PORTAL */}
+                {activePortal === 'citizen' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Citizen input form */}
+                    <div className="lg:col-span-7 bg-[#111827]/60 border border-gray-800/80 rounded-3xl p-6 shadow-xl space-y-6 backdrop-blur">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-lime-400">Submit Pickup Request</h4>
+                        <p className="text-xs text-gray-400">Schedule door-to-door collection with Indore Municipal Corporation.</p>
+                      </div>
+
+                      <form onSubmit={handleCreatePickup} className="space-y-5">
+                        {/* Categories selection */}
+                        <div className="space-y-2">
+                          <label className="text-[10px] uppercase font-bold tracking-wider text-gray-400 block">Select Waste Category</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {[
+                              { id: 'dry', label: 'Dry Waste', color: 'border-blue-500/30 text-blue-400 bg-blue-500/5', desc: 'Plastics, papers' },
+                              { id: 'wet', label: 'Wet Waste', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5', desc: 'Kitchen leftovers' },
+                              { id: 'electronics', label: 'Electrical/E-waste', color: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/5', desc: 'Cords, devices' },
+                              { id: 'medical', label: 'Medical Waste', color: 'border-red-500/30 text-red-400 bg-red-500/5', desc: 'Syringes, medicine' },
+                              { id: 'tin_metal', label: 'Tin & Metal', color: 'border-orange-500/30 text-orange-400 bg-orange-500/5', desc: 'Screws, tin cans' },
+                              { id: 'construction', label: 'Solid/Construction', color: 'border-gray-500/30 text-gray-400 bg-gray-500/5', desc: 'Cement, bricks' },
+                              { id: 'hazardous', label: 'Hazardous Waste', color: 'border-red-600/30 text-red-500 bg-red-600/5', desc: 'Paints, batteries' },
+                              { id: 'organic', label: 'Garden Waste', color: 'border-green-600/30 text-green-400 bg-green-600/5', desc: 'Dry leaves, grass' },
+                              { id: 'textile', label: 'Textile Waste', color: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/5', desc: 'Fabrics, clothes' },
+                              { id: 'glass', label: 'Glass Waste', color: 'border-pink-500/30 text-pink-400 bg-pink-500/5', desc: 'Bottles, jars' },
+                              { id: 'sanitary', label: 'Sanitary Waste', color: 'border-teal-500/30 text-teal-400 bg-teal-500/5', desc: 'Diapers, hygiene' }
+                            ].map((cat) => (
+                              <button
+                                type="button"
+                                key={cat.id}
+                                onClick={() => setNewPickupCategory(cat.id)}
+                                className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer h-20 ${
+                                  newPickupCategory === cat.id
+                                    ? 'border-lime-500 ring-2 ring-lime-500/20 bg-lime-500/10'
+                                    : 'border-gray-800 bg-slate-900/50 hover:border-gray-700'
+                                }`}
+                              >
+                                <span className="text-xs font-bold leading-tight">{cat.label}</span>
+                                <span className="text-[9px] text-gray-400 line-clamp-1">{cat.desc}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Image Upload helper */}
+                        <div className="space-y-2">
+                          <label className="text-[10px] uppercase font-bold tracking-wider text-gray-400 block">Upload Trash Image</label>
+                          <div className="border border-dashed border-gray-800 hover:border-gray-700 bg-slate-900/30 rounded-xl p-4 flex flex-col items-center justify-center relative cursor-pointer min-h-[120px]">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0] || null;
+                                if (file) {
+                                  try {
+                                    const compressed = await compressImage(file);
+                                    setNewPickupImage(compressed);
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      setNewPickupImagePreview(reader.result as string);
+                                    };
+                                    reader.readAsDataURL(compressed);
+                                  } catch (err) {
+                                    console.error('Image compression failed, using original:', err);
+                                    setNewPickupImage(file);
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      setNewPickupImagePreview(reader.result as string);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                } else {
+                                  setNewPickupImage(null);
+                                  setNewPickupImagePreview(null);
+                                }
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            />
+                            {newPickupImagePreview ? (
+                              <div className="flex items-center gap-4 w-full">
+                                <img
+                                  src={newPickupImagePreview}
+                                  alt="Preview"
+                                  className="w-16 h-16 object-cover rounded-lg border border-gray-800"
+                                />
+                                <div className="space-y-0.5 text-left">
+                                  <p className="text-xs font-semibold text-gray-200 line-clamp-1">{newPickupImage?.name}</p>
+                                  <p className="text-[10px] text-gray-500">{(newPickupImage!.size / 1024).toFixed(1)} KB</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNewPickupImage(null);
+                                      setNewPickupImagePreview(null);
+                                    }}
+                                    className="text-[10px] text-red-400 hover:underline cursor-pointer"
+                                  >
+                                    Remove photo
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center space-y-1.5 pointer-events-none">
+                                <Upload className="mx-auto text-gray-500" size={24} />
+                                <p className="text-xs text-gray-300 font-medium">Click or Drag & Drop photo</p>
+                                <p className="text-[10px] text-gray-500">Provide photo for instant Gemini AI smart classification.</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* AI Smart Assist Toggle */}
+                        {newPickupImage && (
+                          <div className="bg-lime-500/5 border border-lime-500/20 rounded-xl p-3 flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              id="triggerAiClassification"
+                              checked={triggerAiClassification}
+                              onChange={(e) => setTriggerAiClassification(e.target.checked)}
+                              className="mt-1 cursor-pointer accent-lime-500"
+                            />
+                            <label htmlFor="triggerAiClassification" className="text-xs space-y-0.5 cursor-pointer text-gray-300">
+                              <span className="font-bold flex items-center gap-1.5 text-lime-400">
+                                <Sparkles size={14} />
+                                Enable Gemini AI Smart Assistant
+                              </span>
+                              <span className="block text-[10px] text-gray-400 leading-normal">
+                                Confused about waste classification? Gemini will examine your photo to auto-detect the optimal waste bin category, assign priority level, and suggest local disposal guidelines.
+                              </span>
+                            </label>
+                          </div>
+                        )}
+
+                        {/* Location picker */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold tracking-wider text-gray-400">GPS Coordinates</label>
+                            <input
+                              type="text"
+                              value={pickupCoordsManual}
+                              onChange={(e) => {
+                                setPickupCoordsManual(e.target.value);
+                                const parts = e.target.value.split(',');
+                                if (parts.length === 2) {
+                                  const lat = parseFloat(parts[0]);
+                                  const lon = parseFloat(parts[1]);
+                                  if (!isNaN(lat) && !isNaN(lon)) {
+                                    setPickupCoords({ lat, lon });
+                                  }
+                                }
+                              }}
+                              placeholder="22.7196, 75.8577"
+                              className="w-full bg-slate-900 border border-gray-800 rounded-xl px-4 py-2.5 text-xs text-gray-200 focus:outline-none focus:border-lime-500"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Collection Area</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Rotate coordinate slightly around Indore centers
+                                const idx = Math.floor(Math.random() * 3);
+                                const locales = [
+                                  { lat: 22.7533, lon: 75.8937, label: 'Vijay Nagar' },
+                                  { lat: 22.7196, lon: 75.8577, label: 'Rajwada Palace' },
+                                  { lat: 22.7301, lon: 75.8845, label: 'Saket Nagar' }
+                                ];
+                                const loc = locales[idx];
+                                setPickupCoords({ lat: loc.lat, lon: loc.lon });
+                                setPickupCoordsManual(`${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`);
+                              }}
+                              className="w-full h-[38px] bg-slate-900 border border-gray-800 rounded-xl text-xs font-semibold hover:border-gray-700 flex items-center justify-center gap-1 text-gray-300 cursor-pointer"
+                            >
+                              <MapPin size={14} className="text-lime-500" />
+                              Cycle Indore Locales
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Submit Request Button */}
+                        <button
+                          type="submit"
+                          disabled={isAiClassificationLoading}
+                          className="w-full py-3.5 bg-gradient-to-r from-lime-500 to-emerald-500 hover:brightness-110 text-slate-950 font-bold rounded-xl text-xs tracking-wider uppercase cursor-pointer transition-all shadow-lg shadow-lime-500/10 flex items-center justify-center gap-2"
+                        >
+                          {isAiClassificationLoading ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></div>
+                              <span>AI Analyzing & Creating pickup...</span>
+                            </>
+                          ) : (
+                            <>
+                              <PlusCircle size={16} />
+                              <span>Submit Collection Request</span>
+                            </>
+                          )}
+                        </button>
+                      </form>
+
+                      {/* AI Classification report card */}
+                      {aiClassificationResult && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 space-y-3 text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                              <Sparkles size={14} className="animate-spin" />
+                              Gemini Real-time AI Analysis Report
+                            </span>
+                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                              Analyzed Successfully
+                            </span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4 text-xs">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] text-gray-500 font-bold uppercase block">Auto Classified Category</span>
+                              <span className="font-bold text-gray-200 capitalize">{aiClassificationResult.category}</span>
+                            </div>
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] text-gray-500 font-bold uppercase block">Risk Assessment Priority</span>
+                              <span className="font-bold text-red-400 block capitalize">{aiClassificationResult.priority}</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 text-xs text-gray-300">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase block">Classification Reasoning</span>
+                            <p className="leading-relaxed">{aiClassificationResult.explanation}</p>
+                          </div>
+
+                          {aiClassificationResult.handlingTip && (
+                            <div className="bg-[#111827]/60 rounded-xl p-3 text-xs border border-emerald-500/10 space-y-0.5">
+                              <span className="text-[10px] text-emerald-400 font-bold uppercase block">Civic Safety Instruction</span>
+                              <p className="text-gray-400">{aiClassificationResult.handlingTip}</p>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </div>
+
+                    {/* My request history & OTPs */}
+                    <div className="lg:col-span-5 bg-[#111827]/60 border border-gray-800/80 rounded-3xl p-6 shadow-xl space-y-6 backdrop-blur flex flex-col h-[600px] overflow-hidden">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-gray-200">
+                          {user?.role === 'admin' ? 'All Active Pickups History' : 'My Pickups History'}
+                        </h4>
+                        <p className="text-xs text-gray-400">
+                          {user?.role === 'admin' ? 'Track all city-wide door-to-door assignments and security keys.' : 'Track your personal door-to-door assignments and security keys.'}
+                        </p>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+                        {isPickupsLoading ? (
+                          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                            <div className="w-6 h-6 border-2 border-lime-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                            <span className="text-xs">Syncing city pickups...</span>
+                          </div>
+                        ) : (user?.role === 'admin' ? pickups : pickups.filter(p => p.user_id === user?.id)).length === 0 ? (
+                          <div className="text-center py-12 text-gray-500 text-xs">
+                            {user?.role === 'admin' ? 'No city-wide garbage pickup requests registered.' : 'You have no registered garbage pickup requests.'}
+                          </div>
+                        ) : (
+                          (user?.role === 'admin' ? pickups : pickups.filter(p => p.user_id === user?.id)).map((p) => (
+                            <div key={p.id} className="bg-slate-900/50 border border-gray-800/80 rounded-2xl p-4 space-y-3 shadow text-left">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-mono font-bold text-gray-400">SC-{p.id.replace('SC-', '')}</span>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] uppercase font-bold tracking-wider ${
+                                  p.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                                  p.status === 'zonal_assigned' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                                  p.status === 'dispatched' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                  'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                }`}>
+                                  {p.status.replace('_', ' ')}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-[9px] text-gray-500 font-bold block uppercase">Category</span>
+                                  <span className="font-semibold text-gray-300 capitalize">{p.category}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[9px] text-gray-500 font-bold block uppercase">Priority</span>
+                                  <span className={`font-semibold capitalize ${
+                                    p.priority === 'high' || p.priority === 'critical' ? 'text-red-400' : 'text-gray-300'
+                                  }`}>{p.priority}</span>
+                                </div>
+                              </div>
+
+                              <div className="text-xs space-y-0.5">
+                                <span className="text-[9px] text-gray-500 font-bold block uppercase">Address</span>
+                                <p className="text-gray-400 line-clamp-2 text-[11px] leading-tight">{p.address}</p>
+                              </div>
+
+                              {p.pickup_eta && p.status !== 'completed' && (
+                                <div className="text-xs bg-[#111827]/40 p-2 rounded-lg border border-gray-800 flex items-center justify-between text-gray-300 font-semibold text-[11px]">
+                                  <span className="text-gray-500 uppercase text-[9px]">Arrival Window</span>
+                                  <span className="text-purple-400">{p.pickup_eta}</span>
+                                </div>
+                              )}
+
+                              {/* Security OTP key block - visible only to owner citizen, admin, or assigned area collector crew */}
+                              {p.status !== 'completed' && (
+                                user?.role === 'admin' ||
+                                user?.id === p.user_id ||
+                                (p.area_man_name && user?.name === p.area_man_name) ||
+                                (p.area_man_id && user?.id === p.area_man_id)
+                              ) && (
+                                <div className="bg-lime-500/5 border border-lime-500/10 rounded-xl p-3 text-center space-y-1">
+                                  <span className="text-[9px] uppercase font-bold tracking-wider text-gray-400 block">Security Verification Code</span>
+                                  <div className="font-mono text-lg font-bold tracking-widest text-lime-400 bg-slate-900/80 inline-block px-4 py-1.5 rounded-lg border border-lime-500/10">
+                                    {p.otp}
+                                  </div>
+                                  <p className="text-[9px] text-gray-500 leading-normal px-2">
+                                    Provide this 4-digit code to the collection worker when they arrive at your door.
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Completed Proof details */}
+                              {p.status === 'completed' && p.photo_proof_url && (
+                                <div className="bg-[#111827]/50 rounded-xl p-2 border border-gray-800 flex items-center gap-3">
+                                  <img
+                                    src={p.photo_proof_url}
+                                    alt="Proof"
+                                    className="w-12 h-12 rounded object-cover border border-gray-800"
+                                  />
+                                  <div className="text-left">
+                                    <span className="text-[9px] uppercase font-bold text-gray-500 block">Collection Proof</span>
+                                    <span className="text-[10px] text-emerald-400 font-semibold block flex items-center gap-1">
+                                      <CheckCircle size={10} /> Verified Collected
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Rating & Review module */}
+                              {p.status === 'completed' && !p.rating && (
+                                <div className="bg-[#111827]/40 border border-gray-800 rounded-xl p-3 space-y-2.5">
+                                  <span className="text-[9px] uppercase font-bold tracking-wider text-lime-400 block">Submit Service Feedback</span>
+                                  
+                                  <div className="flex items-center gap-1">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <button
+                                        type="button"
+                                        key={star}
+                                        onClick={() => setCitizenRatingMap(prev => ({ ...prev, [p.id]: star }))}
+                                        className="text-gray-500 hover:text-yellow-400 transition-colors cursor-pointer"
+                                      >
+                                        <Star
+                                          size={16}
+                                          fill={(citizenRatingMap[p.id] || 0) >= star ? '#FBBF24' : 'none'}
+                                          className={(citizenRatingMap[p.id] || 0) >= star ? 'text-yellow-400' : 'text-gray-500'}
+                                        />
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  <input
+                                    type="text"
+                                    placeholder="Write comments..."
+                                    value={citizenReviewMap[p.id] || ''}
+                                    onChange={(e) => setCitizenReviewMap(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                    className="w-full bg-slate-950 border border-gray-800 rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-lime-500"
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSubmitReview(p.id, citizenRatingMap[p.id] || 5, citizenReviewMap[p.id] || 'Collected on time')}
+                                    className="w-full py-1.5 bg-lime-500 hover:bg-lime-400 text-slate-950 font-bold rounded-lg text-[10px] uppercase tracking-wide cursor-pointer transition-all"
+                                  >
+                                    Submit Feedback
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Rating already complete */}
+                              {p.status === 'completed' && p.rating && (
+                                <div className="bg-slate-950/40 p-2.5 rounded-xl border border-gray-800/80 text-left text-xs space-y-1">
+                                  <div className="flex items-center gap-0.5">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <Star
+                                        key={star}
+                                        size={10}
+                                        fill={star <= p.rating ? '#FBBF24' : 'none'}
+                                        className={star <= p.rating ? 'text-yellow-400' : 'text-gray-700'}
+                                      />
+                                    ))}
+                                  </div>
+                                  <p className="text-gray-400 italic text-[11px]">"{p.review_text}"</p>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ADMIN PORTAL */}
+                {activePortal === 'admin' && (
+                  <div className="space-y-6 text-left">
+                    {/* Admin Dashboard statistics row */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-slate-900/60 border border-gray-800 rounded-2xl p-4 space-y-1.5">
+                        <span className="text-[9px] uppercase font-bold text-gray-500 block">Total Requests</span>
+                        <div className="text-2xl font-bold font-display text-gray-100">{pickups.length}</div>
+                      </div>
+                      <div className="bg-slate-900/60 border border-gray-800 rounded-2xl p-4 space-y-1.5">
+                        <span className="text-[9px] uppercase font-bold text-yellow-500 block">Pending Assign</span>
+                        <div className="text-2xl font-bold font-display text-yellow-500">
+                          {pickups.filter(p => p.status === 'pending').length}
+                        </div>
+                      </div>
+                      <div className="bg-slate-900/60 border border-gray-800 rounded-2xl p-4 space-y-1.5">
+                        <span className="text-[9px] uppercase font-bold text-purple-400 block">Dispatched Crews</span>
+                        <div className="text-2xl font-bold font-display text-purple-400">
+                          {pickups.filter(p => p.status === 'dispatched').length}
+                        </div>
+                      </div>
+                      <div className="bg-slate-900/60 border border-gray-800 rounded-2xl p-4 space-y-1.5">
+                        <span className="text-[9px] uppercase font-bold text-emerald-400 block">Completed</span>
+                        <div className="text-2xl font-bold font-display text-emerald-400">
+                          {pickups.filter(p => p.status === 'completed').length}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Admin management panel card */}
+                    <div className="bg-[#111827]/60 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+                      <div>
+                        <h4 className="text-md font-bold font-display">Municipal Request Intake</h4>
+                        <p className="text-xs text-gray-400 mt-0.5">Approve requests and assign zonal officers to coordinate area dispatches.</p>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs text-left">
+                          <thead>
+                            <tr className="border-b border-gray-800 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                              <th className="py-3 px-4">Request ID</th>
+                              <th className="py-3 px-4">Reporter</th>
+                              <th className="py-3 px-4">Waste Category</th>
+                              <th className="py-3 px-4">Indore Area</th>
+                              <th className="py-3 px-4">Priority</th>
+                              <th className="py-3 px-4">Status</th>
+                              <th className="py-3 px-4">Zonal Coordinator</th>
+                              <th className="py-3 px-4 text-right">Escalation Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-800/60 text-gray-300">
+                            {pickups.map((p) => (
+                              <tr key={p.id} className="hover:bg-slate-900/30">
+                                <td className="py-4 px-4 font-mono font-bold text-gray-400">{p.id}</td>
+                                <td className="py-4 px-4">
+                                  <div className="font-semibold">{p.reporter_name}</div>
+                                  <div className="text-[10px] text-gray-500">{p.reporter_phone}</div>
+                                </td>
+                                <td className="py-4 px-4">
+                                  <span className="px-2 py-0.5 rounded bg-slate-800 border border-gray-700 capitalize font-medium text-gray-300 text-[11px]">
+                                    {p.category}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-4 font-medium text-gray-400 max-w-[150px] truncate">{p.address}</td>
+                                <td className="py-4 px-4">
+                                  <span className={`font-semibold capitalize ${
+                                    p.priority === 'critical' || p.priority === 'high' ? 'text-red-400' : 'text-gray-400'
+                                  }`}>{p.priority}</span>
+                                </td>
+                                <td className="py-4 px-4">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] uppercase font-bold ${
+                                    p.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                                    p.status === 'zonal_assigned' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                                    p.status === 'dispatched' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  }`}>
+                                    {p.status.replace('_', ' ')}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-4 text-gray-300">
+                                  {p.zonal_officer_name ? (
+                                    <span className="font-semibold text-cyan-400 flex items-center gap-1">
+                                      <CheckCircle size={12} /> {p.zonal_officer_name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-500 italic">Unassigned</span>
+                                  )}
+                                </td>
+                                <td className="py-4 px-4 text-right">
+                                  {p.status === 'pending' ? (
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <select
+                                        value={adminAssigneeMap[p.id] || ''}
+                                        onChange={(e) => setAdminAssigneeMap(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                        className="bg-slate-900 border border-gray-800 rounded-lg p-1.5 text-xs text-gray-200"
+                                      >
+                                        <option value="">Choose Zonal Officer...</option>
+                                        <option value="user_2:Officer Rajesh Kumar">Officer Rajesh Kumar</option>
+                                        <option value="zonal_2:Zonal Leader Sunita Rao">Sunita Rao (Vijay Nagar)</option>
+                                      </select>
+                                      <button
+                                        type="button"
+                                        disabled={!adminAssigneeMap[p.id]}
+                                        onClick={() => {
+                                          const raw = adminAssigneeMap[p.id];
+                                          if (!raw) return;
+                                          const [id, name] = raw.split(':');
+                                          handleAssignZonal(p.id, id, name);
+                                        }}
+                                        className="px-3 py-1.5 bg-lime-500 hover:bg-lime-400 text-[#070a13] font-bold rounded-lg text-[10px] uppercase tracking-wide transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                      >
+                                        Assign & Escalate
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Assigned</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                            {pickups.length === 0 && (
+                              <tr>
+                                <td colSpan={8} className="py-8 text-center text-gray-500">
+                                  No active garbage collection requests registered.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ZONAL OFFICER PORTAL */}
+                {activePortal === 'zonal' && (() => {
+                  const zonalFilteredPickups = user?.role === 'admin'
+                    ? pickups.filter(p => p.status !== 'pending')
+                    : pickups.filter(p => p.status !== 'pending' && p.zonal_officer_id === user?.id);
+                  return (
+                    <div className="space-y-6 text-left">
+                      {/* Zonal KPIs */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-slate-900/60 border border-gray-800 rounded-2xl p-4 space-y-1.5">
+                          <span className="text-[9px] uppercase font-bold text-gray-500 block">Zone Assigned tasks</span>
+                          <div className="text-2xl font-bold font-display text-gray-100">
+                            {zonalFilteredPickups.length}
+                          </div>
+                        </div>
+                        <div className="bg-slate-900/60 border border-gray-800 rounded-2xl p-4 space-y-1.5">
+                          <span className="text-[9px] uppercase font-bold text-cyan-400 block">Needs Crew Dispatch</span>
+                          <div className="text-2xl font-bold font-display text-cyan-400">
+                            {zonalFilteredPickups.filter(p => p.status === 'zonal_assigned').length}
+                          </div>
+                        </div>
+                        <div className="bg-slate-900/60 border border-gray-800 rounded-2xl p-4 space-y-1.5">
+                          <span className="text-[9px] uppercase font-bold text-emerald-400 block">Completed Today</span>
+                          <div className="text-2xl font-bold font-display text-emerald-400">
+                            {zonalFilteredPickups.filter(p => p.status === 'completed').length}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Zonal assignments table */}
+                      <div className="bg-[#111827]/60 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+                        <div>
+                          <h4 className="text-md font-bold font-display">Zonal Command Dispatch</h4>
+                          <p className="text-xs text-gray-400 mt-0.5">Deploy area collection crews and specify pickup arrival windows for citizens.</p>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs text-left">
+                            <thead>
+                              <tr className="border-b border-gray-800 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                                <th className="py-3 px-4">Request ID</th>
+                                <th className="py-3 px-4">Citizen</th>
+                                <th className="py-3 px-4">Category</th>
+                                <th className="py-3 px-4">GPS Position</th>
+                                <th className="py-3 px-4">Status</th>
+                                <th className="py-3 px-4">Assigned Crew</th>
+                                <th className="py-3 px-4">Estimated ETA</th>
+                                <th className="py-3 px-4 text-right">Dispatch Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-800/60 text-gray-300">
+                              {zonalFilteredPickups.map((p) => (
+                                <tr key={p.id} className="hover:bg-slate-900/30">
+                                  <td className="py-4 px-4 font-mono font-bold text-gray-400">{p.id}</td>
+                                  <td className="py-4 px-4 font-semibold">{p.reporter_name}</td>
+                                  <td className="py-4 px-4 capitalize">{p.category}</td>
+                                  <td className="py-4 px-4 font-mono text-[11px] text-gray-400">{p.latitude.toFixed(4)}, {p.longitude.toFixed(4)}</td>
+                                  <td className="py-4 px-4">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] uppercase font-bold ${
+                                      p.status === 'zonal_assigned' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                                      p.status === 'dispatched' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                      'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    }`}>
+                                      {p.status.replace('_', ' ')}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-4 font-semibold text-purple-400">
+                                    {p.area_man_name || <span className="text-gray-500 italic">None</span>}
+                                  </td>
+                                  <td className="py-4 px-4 text-gray-300">{p.pickup_eta || <span className="text-gray-500">Awaiting dispatch</span>}</td>
+                                  <td className="py-4 px-4 text-right">
+                                    {p.status === 'zonal_assigned' ? (
+                                      <div className="flex items-center justify-end gap-2">
+                                        <select
+                                          value={zonalCrewMap[p.id] || ''}
+                                          onChange={(e) => setZonalCrewMap(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                          className="bg-slate-900 border border-gray-800 rounded-lg p-1.5 text-xs text-gray-200"
+                                        >
+                                          <option value="">Select Field Crew...</option>
+                                          <option value="area_1:Ravi Shankar">Ravi Shankar (Crew Alpha)</option>
+                                          <option value="area_2:Mohan Kumar">Mohan Kumar (Crew Beta)</option>
+                                          <option value="area_3:Deepak Singh">Deepak Singh (Crew Gamma)</option>
+                                        </select>
+                                        <input
+                                          type="text"
+                                          placeholder="ETA (e.g. Today 3:30 PM)"
+                                          value={zonalEtaMap[p.id] || ''}
+                                          onChange={(e) => setZonalEtaMap(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                          className="bg-slate-900 border border-gray-800 rounded-lg p-1.5 text-xs text-gray-200 w-44"
+                                        />
+                                        <button
+                                          type="button"
+                                          disabled={!zonalCrewMap[p.id]}
+                                          onClick={() => {
+                                            const raw = zonalCrewMap[p.id];
+                                            if (!raw) return;
+                                            const [id, name] = raw.split(':');
+                                            handleDispatchCrew(p.id, id, name, zonalEtaMap[p.id] || 'Today 4:00 PM');
+                                          }}
+                                          className="px-3 py-1.5 bg-lime-500 hover:bg-lime-400 text-[#070a13] font-bold rounded-lg text-[10px] uppercase tracking-wide transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                        >
+                                          Dispatch Crew
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Dispatched</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                              {zonalFilteredPickups.length === 0 && (
+                                <tr>
+                                  <td colSpan={8} className="py-8 text-center text-gray-500">
+                                    No zone-assigned active requests available.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* AREA CREW PORTAL */}
+                {activePortal === 'area' && (
+                  <div className="space-y-6 text-left">
+                    {/* Crew Identity Selector Bar */}
+                    <div className="bg-slate-900/80 border border-gray-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-purple-400">Field Worker Identity Simulation</span>
+                        <h5 className="text-sm font-bold text-gray-200">Select Active Field Crew Worker Profile</h5>
+                      </div>
+                      <select
+                        value={selectedSimCrew}
+                        onChange={(e) => setSelectedSimCrew(e.target.value)}
+                        className="bg-[#111827] border border-gray-800 rounded-xl p-2.5 text-xs text-gray-200 font-medium focus:outline-none focus:border-purple-500 max-w-xs cursor-pointer"
+                      >
+                        <option value="area_1">Ravi Shankar (Crew Alpha)</option>
+                        <option value="area_2">Mohan Kumar (Crew Beta)</option>
+                        <option value="area_3">Deepak Singh (Crew Gamma)</option>
+                      </select>
+                    </div>
+
+                    <div className="bg-[#111827]/60 border border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+                      <div>
+                        <h4 className="text-md font-bold font-display">Active Collection Orders</h4>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Review active pickup spots, verify citizen 4-digit OTP codes, and submit completion images for{' '}
+                          <strong className="text-purple-400">
+                            {selectedSimCrew === 'area_1' ? 'Ravi Shankar (Crew Alpha)' : selectedSimCrew === 'area_2' ? 'Mohan Kumar (Crew Beta)' : 'Deepak Singh (Crew Gamma)'}
+                          </strong>.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {pickups
+                          .filter((p) => (p.status === 'dispatched' || p.status === 'completed') && p.area_man_id === selectedSimCrew)
+                          .map((p) => (
+                            <div key={p.id} className="bg-slate-900/60 border border-gray-800 rounded-2xl p-5 space-y-4 shadow flex flex-col justify-between">
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between border-b border-gray-850 pb-2">
+                                  <span className="font-mono font-bold text-lime-400 text-xs">{p.id}</span>
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] uppercase font-bold ${
+                                    p.status === 'dispatched' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20 animate-pulse' :
+                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  }`}>
+                                    {p.status}
+                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 text-xs text-gray-300">
+                                  <div className="space-y-0.5">
+                                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Citizen Name</span>
+                                    <span className="font-bold">{p.reporter_name}</span>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Phone</span>
+                                    <span className="font-mono">{p.reporter_phone}</span>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Waste Category</span>
+                                    <span className="font-semibold capitalize text-lime-400">{p.category}</span>
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Priority</span>
+                                    <span className="font-semibold capitalize text-red-400">{p.priority}</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-0.5 text-xs">
+                                  <span className="text-[9px] text-gray-500 uppercase font-bold block">Address coordinates</span>
+                                  <p className="text-gray-400 text-[11px] leading-tight">{p.address} ({p.latitude.toFixed(4)}, {p.longitude.toFixed(4)})</p>
+                                </div>
+
+                                {p.image_url && (
+                                  <div className="space-y-1">
+                                    <span className="text-[9px] text-gray-500 uppercase font-bold block">Citizen Reported Photo</span>
+                                    <img
+                                      src={p.image_url}
+                                      alt="Trash"
+                                      className="w-full h-32 object-cover rounded-xl border border-gray-800"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              {p.status === 'dispatched' && (
+                                <div className="bg-slate-950/80 border border-gray-800 rounded-xl p-3 space-y-3 mt-4 text-left">
+                                  <span className="text-[9px] uppercase font-bold tracking-wider text-purple-400 block">Complete Pickup Assignment</span>
+                                  
+                                  <div className="space-y-1.5">
+                                    <label className="text-[10px] text-gray-400 font-semibold block">Enter Citizen 4-Digit Security OTP</label>
+                                    <input
+                                      type="text"
+                                      maxLength={4}
+                                      placeholder="4-digit OTP code"
+                                      value={areaOtpInputs[p.id] || ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value.replace(/\D/g, '');
+                                        setAreaOtpInputs(prev => ({ ...prev, [p.id]: val }));
+                                      }}
+                                      className="w-full bg-slate-900 border border-gray-800 rounded-lg px-3 py-2 text-xs font-mono font-bold tracking-widest text-center text-gray-200 focus:outline-none focus:border-purple-500"
+                                    />
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    <label className="text-[10px] text-gray-400 font-semibold block">Upload Collection Proof Photo</label>
+                                    <div className="flex items-center gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          // Auto assign simulated file
+                                          const mockFile = new File([""], "proof.jpg", { type: "image/jpeg" });
+                                          setAreaProofImages(prev => ({ ...prev, [p.id]: mockFile }));
+                                          setAreaProofPreviews(prev => ({ ...prev, [p.id]: 'https://picsum.photos/seed/collectedproof/800/600' }));
+                                        }}
+                                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-gray-800 rounded-lg text-xs font-semibold text-gray-300 flex items-center gap-1.5 cursor-pointer"
+                                      >
+                                        <Upload size={12} /> Capture Proof
+                                      </button>
+                                      {areaProofPreviews[p.id] && (
+                                        <div className="flex items-center gap-1.5">
+                                          <img
+                                            src={areaProofPreviews[p.id]!}
+                                            alt="Proof Preview"
+                                            className="w-8 h-8 rounded object-cover border border-gray-800"
+                                          />
+                                          <span className="text-[10px] text-gray-500">proof.jpg ready</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={!(areaOtpInputs[p.id]?.length === 4)}
+                                    onClick={() => handleCompletePickup(p.id, areaOtpInputs[p.id], areaProofImages[p.id] || null)}
+                                    className="w-full py-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-lg text-[10px] uppercase tracking-wide transition-all cursor-pointer"
+                                  >
+                                    Authenticate & Complete
+                                  </button>
+                                </div>
+                              )}
+
+                              {p.status === 'completed' && p.photo_proof_url && (
+                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-left space-y-2 mt-4">
+                                  <span className="text-[9px] uppercase font-bold text-emerald-400 block">Collection Completed</span>
+                                  <div className="flex items-center gap-3">
+                                    <img
+                                      src={p.photo_proof_url}
+                                      alt="Collected Proof"
+                                      className="w-16 h-12 rounded object-cover border border-gray-800"
+                                    />
+                                    <div className="text-xs">
+                                      <div className="font-semibold text-gray-200">OTP Authenticated</div>
+                                      <div className="text-gray-500 text-[10px]">{new Date(p.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        {pickups.filter((p) => (p.status === 'dispatched' || p.status === 'completed') && p.area_man_id === selectedSimCrew).length === 0 && (
+                          <div className="col-span-2 py-12 text-center text-gray-500 text-xs">
+                            No active dispatched garbage collections assigned to this crew member.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
           </main>
 
         </div>
@@ -1836,7 +3013,7 @@ export default function IntellistreetApp() {
       {/* Slide-over Modal: Submit Complaint / Report Form */}
       <AnimatePresence>
         {isReportOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[50000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

@@ -65,10 +65,36 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export interface GarbagePickup {
+  id: string; // e.g. "SC-2849"
+  user_id: string;
+  reporter_name: string;
+  reporter_phone: string;
+  category: string; // dry, wet, electronics, medical, tin_metal, construction, hazardous, organic, textile, glass, sanitary
+  image_url: string;
+  latitude: number;
+  longitude: number;
+  address: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'zonal_assigned' | 'dispatched' | 'collected' | 'completed';
+  otp: string; // 4-digit verification code
+  zonal_officer_id?: string;
+  zonal_officer_name?: string;
+  area_man_id?: string;
+  area_man_name?: string;
+  pickup_eta?: string; // e.g. "Today 2:30 PM"
+  photo_proof_url?: string; // photo uploaded by Area Man
+  rating?: number; // citizen rating (1-5)
+  review_text?: string; // citizen review
+  created_at: string;
+  updated_at: string;
+}
+
 interface DatabaseSchema {
   users: User[];
   complaints: Complaint[];
   messages: ChatMessage[];
+  pickups: GarbagePickup[];
 }
 
 const DB_PATH = path.join(process.cwd(), 'data', 'intellistreet_db.json');
@@ -304,6 +330,68 @@ export function getDatabase(): DatabaseSchema {
           text: 'Yes please, meeting them near Saket Club would be incredibly helpful to pinpoint the main valve.',
           created_at: new Date(Date.now() - 0.95 * 24 * 60 * 60 * 1000).toISOString()
         }
+      ],
+      pickups: [
+        {
+          id: 'SC-2849',
+          user_id: 'user_1',
+          reporter_name: 'Manish Pathania',
+          reporter_phone: '9876543210',
+          category: 'wet',
+          image_url: 'https://picsum.photos/seed/wetwaste/800/600',
+          latitude: 22.7196,
+          longitude: 75.8577,
+          address: 'Rajwada, Mahatma Gandhi Road, Indore, Madhya Pradesh 452002',
+          priority: 'medium',
+          status: 'dispatched',
+          otp: '4821',
+          zonal_officer_id: 'user_2',
+          zonal_officer_name: 'Officer Rajesh Kumar',
+          area_man_id: 'area_1',
+          area_man_name: 'Ravi Shankar',
+          pickup_eta: 'Today 3:00 PM',
+          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'SC-2848',
+          user_id: 'user_4',
+          reporter_name: 'Amit Patel',
+          reporter_phone: '9988776655',
+          category: 'medical',
+          image_url: 'https://picsum.photos/seed/medicalwaste/800/600',
+          latitude: 22.7241,
+          longitude: 75.8831,
+          address: '42, Saket Nagar, Near Saket Club, Indore, Madhya Pradesh 452018',
+          priority: 'high',
+          status: 'pending',
+          otp: '1093',
+          created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'SC-2847',
+          user_id: 'user_1',
+          reporter_name: 'Manish Pathania',
+          reporter_phone: '9876543210',
+          category: 'electronics',
+          image_url: 'https://picsum.photos/seed/ewaste/800/600',
+          latitude: 22.7196,
+          longitude: 75.8577,
+          address: 'Rajwada, Shop 12, Indore, Madhya Pradesh 452002',
+          priority: 'medium',
+          status: 'completed',
+          otp: '7724',
+          zonal_officer_id: 'user_2',
+          zonal_officer_name: 'Officer Rajesh Kumar',
+          area_man_id: 'area_1',
+          area_man_name: 'Ravi Shankar',
+          photo_proof_url: 'https://picsum.photos/seed/garbageproof/800/600',
+          rating: 5,
+          review_text: 'Very professional and timely pickup of my old computer parts. Brilliant initiative!',
+          created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 22 * 60 * 60 * 1000).toISOString()
+        }
       ]
     };
 
@@ -313,10 +401,14 @@ export function getDatabase(): DatabaseSchema {
 
   const fileData = fs.readFileSync(DB_PATH, 'utf8');
   try {
-    return JSON.parse(fileData);
+    const data = JSON.parse(fileData);
+    if (!data.pickups) {
+      data.pickups = [];
+    }
+    return data;
   } catch (e) {
     // If corruption happens, return seed format
-    return { users: [], complaints: [], messages: [] };
+    return { users: [], complaints: [], messages: [], pickups: [] };
   }
 }
 

@@ -85,6 +85,15 @@ IntelliStreet utilizes a dual-engine full-stack architecture that splits UI and 
 - **SLA Tracking**: Displays live timers indicating how long an issue has been pending.
 - **One-Click Dispatch**: Admins can coordinate crews directly. Inside the dispatch modal, clicking **"Inspect GIS Telemetry"** automatically switches views back to the active GIS map and launches the high-fidelity orbital zoom sequence directly on the target coordinates.
 
+### 4. Swachh Connect Portal (Role-Isolated Waste Collection Loop)
+The **Swachh Connect** tab implements a complete, end-to-end door-to-door waste collection pipeline. Crucially, the interface is governed by strict **Role-Based Access Control (RBAC)** and advanced client-side features to ensure that municipal operations are secure, efficient, and user-friendly:
+- **👤 Citizen App (Citizen-Only)**: Only visible to logged-in users with the `citizen` role. It lets residents select from 11 specialized waste categories (e.g., Dry, Wet, E-waste, Sanitary), log their precise coordinates, submit pickups, view live requests, and access their unique 4-digit security OTP.
+- **⚡ Client-Side Image Compression**: Integrated a high-performance HTML5 Canvas compression pipeline. When citizens upload high-resolution images, they are dynamically scaled down to a maximum of 1024x1024 pixels and compressed to JPEG formats on-the-fly. This guarantees lightning-fast uploads and prevents server-side `Payload Too Large (413)` errors, offering a flawless user experience.
+- **🏛️ Admin Dashboard (Admin-Only)**: Only visible to users with the `admin` role. It serves as the municipal oversight board to approve pending requests, assign them to regional Zonal Officers, and track live SLAs.
+- **📍 Zonal Officer Terminal (Officer-Only)**: Only visible to municipal officers. It allows them to dispatch field personnel (Area Crews) and set estimated collection windows (ETAs). It dynamically filters active pickups to display only those assigned to the logged-in officer's jurisdiction, ensuring clear and isolated regional oversight.
+- **🚛 Area Crew App & Identity Simulator (Officer-Only)**: Only visible to field crews (`officer` role). It enables physical workers on the ground to input the citizen's secure 4-digit OTP, upload photo proof of successful collection, and close the loop. Features a built-in **Field Crew Identity Simulator** allowing officers and admins to test different active crew members (e.g., Ravi Shankar/Crew Alpha, Mohan Kumar/Crew Beta, Deepak Singh/Crew Gamma) and view only their specific active dispatches.
+- **🔐 Automatic Role Synchronization**: A background React `useEffect` dynamically monitors the authenticated session state. If a user's role shifts or a different user logs in, the active Swachh Connect portal automatically synchronizes with their approved clearance level, rendering unauthorized simulator tabs invisible to citizens.
+
 ---
 
 ## 💻 Local Setup & Installation
