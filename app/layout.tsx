@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
+import PWARegister from '@/components/PWARegister';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body suppressHydrationWarning className="bg-[#0b0f19] text-gray-100 antialiased font-sans">
+        <PWARegister />
         {children}
       </body>
     </html>

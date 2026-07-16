@@ -402,6 +402,15 @@ export function getDatabase(): DatabaseSchema {
   const fileData = fs.readFileSync(DB_PATH, 'utf8');
   try {
     const data = JSON.parse(fileData);
+    if (!data.users) {
+      data.users = [];
+    }
+    if (!data.complaints) {
+      data.complaints = [];
+    }
+    if (!data.messages) {
+      data.messages = [];
+    }
     if (!data.pickups) {
       data.pickups = [];
     }

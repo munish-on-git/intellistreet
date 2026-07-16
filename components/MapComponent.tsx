@@ -40,16 +40,42 @@ export default function MapComponent({
 }: MapComponentProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
+  const mapplsKey = process.env.NEXT_PUBLIC_MAPPLS_API_KEY;
+  
   // Script loaded and active state
   const [mapplsLoaded, setMapplsLoaded] = useState(false);
   const [mapplsActive, setMapplsActive] = useState(false);
+  const [mapplsLoadError, setMapplsLoadError] = useState(false);
+  
+  const isWaitingForMappls = !!(mapplsKey && !mapplsLoaded && !mapplsLoadError);
   const [mapStyle, setMapStyle] = useState<'standard' | 'roadmap' | 'hybrid'>('standard');
   const [showSmartGrid, setShowSmartGrid] = useState(true);
+
+  const [currentDomain, setCurrentDomain] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      requestAnimationFrame(() => {
+        setCurrentDomain(window.location.hostname);
+      });
+    }
+  }, []);
 
   // Cinematic Google Earth Zoom & Plunge states
   const [isCinematicZooming, setIsCinematicZooming] = useState(false);
   const [cinematicAltitude, setCinematicAltitude] = useState(100000); // meters
   const [showPhotoOverlay, setShowPhotoOverlay] = useState(false);
+
+  // Compact map controls state for better mobile UX
+  const [isControlsExpanded, setIsControlsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      requestAnimationFrame(() => {
+        setIsControlsExpanded(window.innerWidth > 1024);
+      });
+    }
+  }, []);
 
   // Ref to track if cinematic zooming is active
   const isCinematicZoomingRef = useRef(false);
@@ -174,8 +200,6 @@ export default function MapComponent({
   const leafletPolylinesRef = useRef<any[]>([]);
   const tileLayerRef = useRef<any>(null);
 
-  const mapplsKey = process.env.NEXT_PUBLIC_MAPPLS_API_KEY;
-
   // Global Telemetry Handler Hook for Leaflet HTML elements
   useEffect(() => {
     window.inspectTelemetry = (id: string) => {
@@ -229,10 +253,12 @@ export default function MapComponent({
       console.log("[Mappls Map] Web SDK script loaded successfully.");
       setMapplsLoaded(true);
       setMapplsActive(true);
+      setMapplsLoadError(false);
     };
-    script.onerror = (err) => {
-      console.warn("[Mappls Map] Script failed to load:", err);
+    script.onerror = () => {
+      console.log("[Mappls Map] Dynamic load failed or domain whitelisting is needed. Falling back to Leaflet.");
       setMapplsActive(false);
+      setMapplsLoadError(true);
     };
 
     document.head.appendChild(script);
@@ -241,6 +267,12 @@ export default function MapComponent({
   // 2. Map Initialization Loop (Mappls OR Leaflet Fallback)
   useEffect(() => {
     if (!mapContainerRef.current) return;
+
+    // Wait for Mappls SDK if key is provided and no load error has occurred
+    if (isWaitingForMappls) {
+      console.log("[Map Component] Waiting for Mappls Web SDK script to load before choosing engine...");
+      return;
+    }
 
     // A. MAPPLS MAP INITIALIZATION (IF ACTIVE)
     if (mapplsActive && mapplsLoaded && window.mappls) {
@@ -370,26 +402,6 @@ export default function MapComponent({
           markerIconUrl = 'https://raw.githubusercontent.com/Concept211/Google-Maps-Markers/master/images/marker_green.png';
         }
 
-        const popupContent = `
-          <div style="min-width: 220px; font-family: system-ui, sans-serif; padding: 6px; color: #1e293b; background: white; border-radius: 12px;">
-            <h4 style="font-weight: 700; font-size: 14px; margin: 0 0 4px; color: #0f172a; line-height: 1.3;">${marker.title}</h4>
-            <p style="font-size: 11px; color: #4B5563; margin: 0 0 8px;">
-              ${marker.address || 'Indore Smart Grid Zone'}
-            </p>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background-color: ${color}20; color: ${color}; text-transform: uppercase;">
-                ${marker.status.replace('_', ' ')}
-              </span>
-              <span style="font-size: 11px; color: #10b981; font-weight: 700;">
-                Mappls Verified
-              </span>
-            </div>
-            <button onclick="if(window.inspectTelemetry){ window.inspectTelemetry('${marker.id}'); }" style="width: 100%; border: none; background: #10b981; color: white; padding: 6px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; cursor: pointer;">
-              Inspect Telemetry
-            </button>
-          </div>
-        `;
-
         try {
           const mMarker = new window.mappls.Marker({
             map: map,
@@ -400,7 +412,6 @@ export default function MapComponent({
             icon_url: markerIconUrl,
             width: 28,
             height: 44,
-            popupHtml: popupContent,
             fitbounds: false
           });
 
@@ -473,28 +484,6 @@ export default function MapComponent({
           fillOpacity: 0.95
         }).addTo(map);
 
-        const popupContent = `
-          <div style="min-width: 220px; font-family: system-ui, sans-serif; padding: 4px; color: #1e293b;">
-            <h4 style="font-weight: 700; font-size: 14px; margin: 0 0 4px; color: #0f172a; line-height: 1.3;">${marker.title}</h4>
-            <p style="font-size: 11px; color: #4B5563; margin: 0 0 8px;">
-              ${marker.address || 'Indore Smart Grid Zone'}
-            </p>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background-color: ${color}20; color: ${color}; text-transform: uppercase;">
-                ${marker.status.replace('_', ' ')}
-              </span>
-              <span style="font-size: 11px; color: #6b7280; font-weight: 600;">
-                ✓ ${marker.verification_count || 0} Votes
-              </span>
-            </div>
-            <button onclick="if(window.inspectTelemetry){ window.inspectTelemetry('${marker.id}'); }" style="width: 100%; text-align: center; border: none; background: #3b82f6; color: white; padding: 7px 10px; font-size: 11px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
-              Inspect Live Telemetry
-            </button>
-          </div>
-        `;
-
-        circleMarker.bindPopup(popupContent);
-
         circleMarker.on('click', () => {
           if (isCinematicZoomingRef.current) return;
           onSelectMarker(marker);
@@ -521,7 +510,7 @@ export default function MapComponent({
         leafletPolylinesRef.current.push(polyline);
       }
     }
-  }, [markers, mapplsActive, mapplsLoaded, showSmartGrid, mapStyle]);
+  }, [markers, mapplsActive, mapplsLoaded, showSmartGrid, mapStyle, isWaitingForMappls]);
 
   // 3. Handle Map Style Switching (Leaflet or Mappls)
   useEffect(() => {
@@ -655,8 +644,22 @@ export default function MapComponent({
       {/* Map Canvas div element */}
       <div ref={mapContainerRef} className="w-full h-full min-h-[500px] bg-slate-950" id="mappls-map-canvas" />
 
+      {isWaitingForMappls && (
+        <div className="absolute inset-0 bg-[#0c101d] flex flex-col items-center justify-center z-[10001] gap-4">
+          <div className="relative w-16 h-16 flex items-center justify-center">
+            <span className="absolute inset-0 rounded-full border-2 border-emerald-500/20 animate-ping" />
+            <div className="w-12 h-12 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            <Globe className="absolute text-emerald-400 w-5 h-5 animate-pulse" />
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-xs font-bold text-gray-200 uppercase tracking-widest animate-pulse">Connecting GIS Mesh</p>
+            <p className="text-[10px] text-gray-500 font-mono">Initializing Mappls Vector Engine...</p>
+          </div>
+        </div>
+      )}
+
       {/* 1. Cinematic Atmospheric Plunge Overlay (Google Earth Mode) */}
-      {isCinematicZooming && (
+      {!isWaitingForMappls && isCinematicZooming && (
         <div className="absolute inset-0 z-[10000] bg-black/40 pointer-events-none flex flex-col items-center justify-between p-8 overflow-hidden scanline animate-shudder">
           
           {/* Top Telemetry Display */}
@@ -714,7 +717,7 @@ export default function MapComponent({
 
       {/* 2. Google Earth Citizen Photo Card Overlay */}
       {showPhotoOverlay && selectedMarker && (
-        <div className="absolute bottom-4 left-4 z-[9998] max-w-sm w-80 bg-[#0c101d]/95 backdrop-blur-md border border-emerald-500/30 p-4 rounded-3xl shadow-2xl flex flex-col gap-3 transition-all duration-300 transform translate-y-0 opacity-100">
+        <div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-auto sm:w-80 z-[9998] bg-[#0c101d]/95 backdrop-blur-md border border-emerald-500/30 p-3 sm:p-4 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col gap-2 sm:gap-3 transition-all duration-300 transform translate-y-0 opacity-100">
           <div className="flex justify-between items-center border-b border-gray-800 pb-2">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -731,43 +734,43 @@ export default function MapComponent({
           </div>
 
           {/* Immersive Citizen Upload Photo Bubble with premium frame */}
-          <div className="relative h-44 rounded-2xl overflow-hidden border border-gray-800 bg-slate-950 shadow-inner">
+          <div className="relative h-32 sm:h-44 rounded-xl sm:rounded-2xl overflow-hidden border border-gray-800 bg-slate-950 shadow-inner">
             <img
               src={selectedMarker.image_url || `https://picsum.photos/seed/street_${selectedMarker.id}/800/600`}
               alt={selectedMarker.title}
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
             />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/95 to-transparent p-3 flex justify-between items-end">
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/95 to-transparent p-2.5 sm:p-3 flex justify-between items-end">
               <div>
-                <p className="text-[9px] text-gray-400 tracking-wider">FIELD SOURCE</p>
-                <p className="text-xs font-bold text-white truncate max-w-[140px]">
+                <p className="text-[8px] sm:text-[9px] text-gray-400 tracking-wider">FIELD SOURCE</p>
+                <p className="text-[11px] sm:text-xs font-bold text-white truncate max-w-[120px] sm:max-w-[140px]">
                   {selectedMarker.reporter_name || 'Citizen Reporter'}
                 </p>
               </div>
-              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold uppercase border border-emerald-500/20 tracking-wider">
+              <span className="text-[8px] sm:text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 sm:px-2 py-0.5 rounded font-bold uppercase border border-emerald-500/20 tracking-wider">
                 Verified
               </span>
             </div>
           </div>
 
           {/* Details / Telemetry summary */}
-          <div className="space-y-1">
-            <h4 className="text-sm font-bold text-white leading-tight">{selectedMarker.title}</h4>
-            <p className="text-[11px] text-gray-400 leading-normal">
+          <div className="space-y-0.5 sm:space-y-1">
+            <h4 className="text-xs sm:text-sm font-bold text-white leading-tight">{selectedMarker.title}</h4>
+            <p className="text-[10px] sm:text-[11px] text-gray-400 leading-normal line-clamp-2 sm:line-clamp-none">
               {selectedMarker.description || 'Verified on-site telemetry. Active municipal GIS monitoring node lock.'}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-[10px] font-mono border-t border-gray-800/60 pt-2">
-            <div className="bg-slate-900/60 p-2 rounded-lg border border-gray-800">
-              <p className="text-gray-500 tracking-wider">STREET ZONE</p>
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-mono border-t border-gray-800/60 pt-2">
+            <div className="bg-slate-900/60 p-1.5 sm:p-2 rounded-lg border border-gray-800">
+              <p className="text-gray-500 tracking-wider text-[8px] sm:text-[9px]">STREET ZONE</p>
               <p className="text-gray-300 font-bold truncate">
                 {selectedMarker.address || 'Indore Smart Grid'}
               </p>
             </div>
-            <div className="bg-slate-900/60 p-2 rounded-lg border border-gray-800">
-              <p className="text-gray-500 tracking-wider">CONFIRMATIONS</p>
+            <div className="bg-slate-900/60 p-1.5 sm:p-2 rounded-lg border border-gray-800">
+              <p className="text-gray-500 tracking-wider text-[8px] sm:text-[9px]">CONFIRMATIONS</p>
               <p className="text-emerald-400 font-bold">
                 ✓ {selectedMarker.verification_count || 1} Votes
               </p>
@@ -782,83 +785,125 @@ export default function MapComponent({
                 startSatelliteZoomTransition(selectedMarker.latitude, selectedMarker.longitude, selectedMarker);
               }
             }}
-            className="w-full mt-1 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-450 text-[#070a13] font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer"
+            className="w-full mt-0.5 py-2 sm:py-2.5 px-4 bg-emerald-500 hover:bg-emerald-450 text-[#070a13] font-extrabold rounded-lg sm:rounded-xl text-[10px] sm:text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer"
           >
-            <Sparkles size={13} /> Inspect Live Telemetry
+            <Sparkles size={12} /> Inspect Live Telemetry
           </button>
         </div>
       )}
 
       {/* Floating Modern Interactive GIS Layer Switcher Overlay (Universal style modes & streetlight layer) */}
-      <div className="absolute top-4 right-4 z-[9999] bg-[#0c101d]/90 backdrop-blur-md border border-gray-800 p-4 rounded-2xl shadow-xl max-w-xs space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${mapplsActive ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400 animate-pulse'}`} />
-            <span className="text-xs font-bold text-gray-200 uppercase tracking-wide">
-              {mapplsActive ? 'Mappls GIS Engine' : 'Live GIS Leaflet'}
-            </span>
+      {!isControlsExpanded ? (
+        <button
+          type="button"
+          onClick={() => setIsControlsExpanded(true)}
+          className="absolute top-4 right-4 z-[9999] w-10 h-10 rounded-full bg-[#0c101d]/95 border border-gray-800 flex items-center justify-center text-emerald-400 hover:text-emerald-350 hover:bg-[#151b30] shadow-xl cursor-pointer transition-all active:scale-95 animate-fade-in"
+          title="Map Layers and style settings"
+        >
+          <Layers size={18} />
+        </button>
+      ) : (
+        <div className="absolute top-4 right-4 z-[9999] bg-[#0c101d]/95 backdrop-blur-md border border-gray-800 p-3 sm:p-4 rounded-2xl shadow-xl max-w-[230px] sm:max-w-xs space-y-2 sm:space-y-3">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${mapplsActive ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400 animate-pulse'}`} />
+              <span className="text-[10px] sm:text-xs font-bold text-gray-200 uppercase tracking-wide">
+                {mapplsActive ? 'Mappls GIS' : 'GIS Leaflet'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[7px] sm:text-[8px] bg-gray-800 px-1 py-0.5 rounded text-gray-400 font-mono">
+                V3.0
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsControlsExpanded(false)}
+                className="text-gray-400 hover:text-white text-[9px] sm:text-[10px] bg-slate-800 hover:bg-slate-750 w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                title="Collapse Panel"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-          <span className="text-[9px] bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 uppercase font-mono">
-            V3.0
-          </span>
-        </div>
 
-        {/* Global style switcher for both engines! */}
-        <div className="space-y-1.5">
-          <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">GIS Map Style</span>
-          <div className="grid grid-cols-3 gap-1 bg-[#1a2035]/60 p-1 rounded-xl border border-gray-800">
+          {/* Global style switcher for both engines! */}
+          <div className="space-y-1 sm:space-y-1.5">
+            <span className="text-[8px] sm:text-[10px] uppercase font-bold text-gray-500 tracking-wider">GIS Map Style</span>
+            <div className="grid grid-cols-3 gap-0.5 sm:gap-1 bg-[#1a2035]/60 p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-gray-800">
+              <button
+                type="button"
+                onClick={() => setMapStyle('standard')}
+                className={`px-1 py-1 sm:px-1.5 sm:py-1.5 text-[8px] sm:text-[9px] font-bold rounded-md sm:rounded-lg transition-all cursor-pointer text-center ${
+                  mapStyle === 'standard' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                Slate
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapStyle('roadmap')}
+                className={`px-1 py-1 sm:px-1.5 sm:py-1.5 text-[8px] sm:text-[9px] font-bold rounded-md sm:rounded-lg transition-all cursor-pointer text-center ${
+                  mapStyle === 'roadmap' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                Roads
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapStyle('hybrid')}
+                className={`px-1 py-1 sm:px-1.5 sm:py-1.5 text-[8px] sm:text-[9px] font-bold rounded-md sm:rounded-lg transition-all cursor-pointer text-center ${
+                  mapStyle === 'hybrid' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                Satellite
+              </button>
+            </div>
+          </div>
+
+          {!mapplsActive ? (
+            <div className="space-y-1.5">
+              <p className="text-[8px] sm:text-[9px] text-gray-400 leading-normal">
+                Equipped with high-res satellite imagery, streets, lanes, & smart grid.
+              </p>
+              {mapplsLoadError && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1.5 text-[8px] sm:text-[9px] text-amber-200">
+                  <p className="font-bold flex items-center gap-1 text-amber-300">
+                    <span>⚠️</span> Mappls Domain Character Limit
+                  </p>
+                  <p className="leading-normal text-gray-300">
+                    The Mappls developer portal has a strict backend-enforced limit of <strong>25 characters</strong> per whitelist domain row, which truncates the long Cloud Run domain.
+                  </p>
+                  <p className="leading-normal text-emerald-400 font-medium">
+                    ✓ <strong>Localhost is fully supported</strong>: Mappls loads beautifully when running the app locally on <code className="bg-[#030712] px-1 py-0.5 rounded border border-gray-800 select-all">localhost</code> (9 chars).
+                  </p>
+                  <p className="leading-normal text-sky-400 font-medium">
+                    ✦ <strong>Production Custom Domain</strong>: When deploying with a short custom domain (e.g. <code className="bg-[#030712] px-1 py-0.5 rounded border border-gray-800">yourdomain.com</code> under 25 chars), you can whitelist it easily.
+                  </p>
+                  <p className="leading-normal text-gray-400 text-[7px] sm:text-[7.5px] border-t border-gray-800/80 pt-1">
+                    *The high-fidelity <strong>Google Maps Fallback Engine</strong> is active automatically here to let you test all interactive reports & grid visuals seamlessly!
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-[8px] sm:text-[10px] text-gray-400 leading-normal">
+              High-fidelity Mappls vector engine layers active.
+            </p>
+          )}
+
+          {/* Universal Layer Toggle - Streetlight connection grid lines */}
+          <div className="pt-1.5 sm:pt-2 border-t border-gray-800/80 flex items-center justify-between gap-2.5">
+            <span className="text-[8px] sm:text-[10px] font-bold text-gray-300">Streetlight Power Grid</span>
             <button
               type="button"
-              onClick={() => setMapStyle('standard')}
-              className={`px-1.5 py-1.5 text-[9px] font-bold rounded-lg transition-all cursor-pointer text-center ${
-                mapStyle === 'standard' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-gray-400 hover:text-gray-200'
-              }`}
+              onClick={() => setShowSmartGrid((prev) => !prev)}
+              className={`w-8 h-4.5 sm:w-9 sm:h-5 rounded-full p-0.5 transition-colors cursor-pointer ${showSmartGrid ? 'bg-teal-500' : 'bg-slate-800'}`}
             >
-              Slate
-            </button>
-            <button
-              type="button"
-              onClick={() => setMapStyle('roadmap')}
-              className={`px-1.5 py-1.5 text-[9px] font-bold rounded-lg transition-all cursor-pointer text-center ${
-                mapStyle === 'roadmap' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              Roads
-            </button>
-            <button
-              type="button"
-              onClick={() => setMapStyle('hybrid')}
-              className={`px-1.5 py-1.5 text-[9px] font-bold rounded-lg transition-all cursor-pointer text-center ${
-                mapStyle === 'hybrid' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              Satellite
+              <div className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-white transition-transform ${showSmartGrid ? 'translate-x-3.5 sm:translate-x-4' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>
-
-        {!mapplsActive ? (
-          <p className="text-[10px] text-gray-400 leading-normal">
-            Equipped with high-resolution satellite imagery layers, streets, lanes, shops, & live telemetry overlay.
-          </p>
-        ) : (
-          <p className="text-[10px] text-gray-400 leading-normal">
-            High-fidelity Mappls vector engine layers active.
-          </p>
-        )}
-
-        {/* Universal Layer Toggle - Streetlight connection grid lines */}
-        <div className="pt-2 border-t border-gray-800/80 flex items-center justify-between gap-4">
-          <span className="text-[10px] font-bold text-gray-300">Streetlight Power Grid Layer</span>
-          <button
-            type="button"
-            onClick={() => setShowSmartGrid((prev) => !prev)}
-            className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${showSmartGrid ? 'bg-teal-500' : 'bg-slate-800'}`}
-          >
-            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${showSmartGrid ? 'translate-x-4' : 'translate-x-0'}`} />
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
