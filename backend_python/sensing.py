@@ -4,7 +4,7 @@ import base64
 from pathlib import Path
 from google import genai
 from google.genai import types
-from .config import GEMINI_API_KEY
+from config import GEMINI_API_KEY
 
 def get_gemini_client():
     if not GEMINI_API_KEY:

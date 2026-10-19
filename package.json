@@ -1,7 +1,19 @@
 {
-  "name": "ai-studio-applet",
+  "name": "intellistreet",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "description": "AI-assisted civic engagement and GIS platform for reporting and resolving municipal issues",
+  "author": "YOUR NAME",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/munish-on-git/intellistreet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/munish-on-git/intellistreet.git/issues"
+  },
+  "homepage": "https://github.com/munish-on-git/intellistreet.git#readme",
+  "keywords": ["civic-tech", "smart-city", "gis", "nextjs", "gemini"],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
