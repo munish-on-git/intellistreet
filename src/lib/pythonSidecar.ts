@@ -59,7 +59,7 @@ export async function ensurePythonServer(): Promise<void> {
     console.log('[Python Sidecar] Spawning FastAPI Server...');
     const child = spawn(
       'python3',
-      ['-m', 'uvicorn', 'backend_python.main:app', '--host', '127.0.0.1', '--port', '8000'],
+      ['-m', 'uvicorn', 'main:app', '--app-dir', 'backend_python', '--host', '127.0.0.1', '--port', '8000'],
       {
         detached: true,
         stdio: 'ignore', // Let it run quietly in background

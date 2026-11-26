@@ -48,7 +48,7 @@ To run the Python sidecar manually (optional, from the **repository root**):
 ```bash
 python3 -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r backend_python/requirements.txt
-python3 -m uvicorn backend_python.main:app --host 127.0.0.1 --port 8000 --reload
+python3 -m uvicorn main:app --app-dir backend_python --host 127.0.0.1 --port 8000 --reload
 # API docs: http://127.0.0.1:8000/docs
 ```
 
